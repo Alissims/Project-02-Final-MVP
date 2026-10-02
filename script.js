@@ -65,6 +65,15 @@ function progressBlock(book) {
   return box;
 }
 
+// Finds a cover (and page count) for a book that was added by hand.
+async function lookupBook(book) {
+  const q = "intitle:" + book.title + (book.author ? " inauthor:" + book.author : "");
+  const res = await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=5&printType=books&q=" + encodeURIComponent(q));
+  const items = (await res.json()).items || [];
+  const hit = items.find((it) => it.volumeInfo.imageLinks && it.volumeInfo.imageLinks.thumbnail);
+  return hit ? hit.volumeInfo : null;
+}
+
 function card(book) {
   const li = el("li", { className: "book" });
   li.style.setProperty("--status-color", "var(--" + book.status + ")");
@@ -88,6 +97,26 @@ function card(book) {
     controls.append(stars);
   }
 
+  if (!book.cover) {
+    const find = el("button", { type: "button", className: "find-cover", textContent: "Find cover" });
+    find.addEventListener("click", async () => {
+      find.textContent = "Looking…"; find.disabled = true;
+      try {
+        const v = await lookupBook(book);
+        if (!v) { find.textContent = "No cover found"; return; }
+        book.cover = v.imageLinks.thumbnail.replace("http://", "https://");
+        if (!book.pages && v.pageCount) book.pages = v.pageCount;
+        if (!book.genre && v.categories) book.genre = v.categories[0];
+        save(); render();
+      } catch (e) { find.textContent = "Try again"; find.disabled = false; }
+    });
+    controls.append(find);
+  }
+  if (!book.cover) {
+    const find = el("button", { type: "button", className: "find-btn", textContent: "Find cover" });
+    find.addEventListener("click", () => findCover(book, find));
+    controls.append(find);
+  }
   const remove = el("button", { type: "button", className: "delete-btn", textContent: "Remove" });
   remove.addEventListener("click", () => deleteBook(book.id, book.title));
   controls.append(remove);
@@ -143,6 +172,8 @@ POPULAR.forEach((p) => {
   p.cover = "https://covers.openlibrary.org/b/isbn/" + p.isbn + "-M.jpg?default=false";
   p.cover2 = "https://books.google.com/books/content?vid=ISBN" + p.isbn + "&printsec=frontcover&img=1&zoom=1";
 });
+// Google only has a generic gray "no image" for this one, so use the designed placeholder.
+POPULAR.find((p) => p.title === "Actually, Nevermind").cover2 = "";
 
 function renderPopular() {
   const list = $("popular-list");
@@ -164,6 +195,72 @@ function renderPopular() {
   });
 }
 
+// Find a cover for a book that has none (searches Google Books).
+async function findCover(book, btn) {
+  btn.textContent = "Searching…";
+  btn.disabled = true;
+  const queries = [
+    "intitle:" + book.title + " inauthor:" + book.author,
+    "intitle:" + book.title
+  ];
+  for (const q of queries) {
+    try {
+      const res = await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=5&printType=books&q=" + encodeURIComponent(q));
+      const items = (await res.json()).items || [];
+      const hit = items.find((i) => i.volumeInfo.imageLinks && i.volumeInfo.imageLinks.thumbnail);
+      if (hit) {
+        book.cover = hit.volumeInfo.imageLinks.thumbnail.replace("http://", "https://");
+        if (!book.pages && hit.volumeInfo.pageCount) book.pages = hit.volumeInfo.pageCount;
+        save(); render();
+        return;
+      }
+    } catch (e) { /* try next query */ }
+  }
+  btn.textContent = "No cover found";
+}
+
+// Library card: a keepsake with the reader's name, city, and state (saved in this browser only).
+function renderCard() {
+  let info = JSON.parse(localStorage.getItem("pagetrail-card")) || {};
+  const read = books.filter((b) => b.status === "read").length;
+  const reading = books.filter((b) => b.status === "reading").length;
+  const place = [info.city, info.state].filter(Boolean).join(", ");
+  const card = $("library-card");
+  card.innerHTML = "";
+  card.append(
+    el("div", { className: "lc-head" },
+      el("strong", { textContent: (info.city ? info.city + " " : "") + "Reader's Library" }),
+      el("span", { textContent: info.state ? info.state : "PageTrail member" })
+    ),
+    el("div", { className: "lc-body" },
+      el("div", { className: "lc-name", textContent: info.name || "Your name here" }),
+      el("div", { className: "lc-place", textContent: place || "Your city, state" }),
+      el("div", { className: "lc-row" }, el("span", { textContent: "Card no." }), el("strong", { textContent: info.number || "—" })),
+      el("div", { className: "lc-row" }, el("span", { textContent: "Member since" }), el("strong", { textContent: info.since || "—" })),
+      el("div", { className: "lc-row" }, el("span", { textContent: "Books read" }), el("strong", { textContent: String(read) })),
+      el("div", { className: "lc-row" }, el("span", { textContent: "Reading now" }), el("strong", { textContent: String(reading) }))
+    ),
+    el("div", { className: "lc-barcode", role: "presentation" }),
+    el("div", { className: "lc-foot", textContent: "Due back whenever you finish the last page." })
+  );
+  $("card-name").value = info.name || "";
+  $("card-city").value = info.city || "";
+  $("card-state").value = info.state || "";
+}
+$("card-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const old = JSON.parse(localStorage.getItem("pagetrail-card")) || {};
+  const info = {
+    name: $("card-name").value.trim(),
+    city: $("card-city").value.trim(),
+    state: $("card-state").value.trim(),
+    number: old.number || "PT-" + String(Math.floor(100000 + Math.random() * 900000)),
+    since: old.since || String(new Date().getFullYear())
+  };
+  localStorage.setItem("pagetrail-card", JSON.stringify(info));
+  renderCard();
+});
+
 function render() {
   const root = $("shelves");
   root.innerHTML = "";
@@ -184,6 +281,7 @@ function render() {
   renderChips();
   renderStats();
   renderPopular();
+  renderCard();
 }
 
 function renderStats() {
@@ -278,8 +376,7 @@ $("search-form").addEventListener("submit", async (e) => {
 $("filter-text").addEventListener("input", (e) => { filter.text = e.target.value.trim(); render(); });
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach((x) => { x.classList.toggle("active", x === t); x.toggleAttribute("aria-current", x === t); });
-  $("view-shelves").hidden = t.dataset.view !== "shelves";
-  $("view-stats").hidden = t.dataset.view !== "stats";
+  ["shelves", "stats", "card"].forEach((v) => { $("view-" + v).hidden = t.dataset.view !== v; });
 }));
 
 render();
