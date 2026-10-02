@@ -1,1 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageTrail — a private reading shelf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <div>
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+          <path d="M6 8c6-3 12-3 18 0v30c-6-3-12-3-18 0V8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M42 8c-6-3-12-3-18 0v30c6-3 12-3 18 0V8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M24 8v30" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h1>PageTrail</h1>
+      </div>
+      <p class="tagline">A private shelf for what you're reading. No feed, no followers, no ratings but yours.</p>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button class="tab active" data-view="shelves" aria-current="page">Shelves</button>
+      <button class="tab" data-view="stats">Stats</button>
+    </nav>
+  </div>
+</header>
 
+<main>
+  <div id="view-shelves">
+    <section class="add-book" aria-labelledby="add-heading">
+      <h2 id="add-heading">Add a book</h2>
+      <form id="search-form" class="search-row" role="search">
+        <div class="field">
+          <label for="q">Search by title or author</label>
+          <input type="search" id="q" required placeholder="The Book of Delights">
+        </div>
+        <div class="field field-select">
+          <label for="status">Add to shelf</label>
+          <select id="status">
+            <option value="want">Want to read</option>
+            <option value="reading">Reading</option>
+            <option value="read">Read</option>
+          </select>
+        </div>
+        <button type="submit" class="btn">Search</button>
+      </form>
+      <p id="search-msg" class="msg" role="status"></p>
+      <ul id="results" class="results"></ul>
+
+      <details class="manual">
+        <summary>Can't find it? Add it by hand</summary>
+        <form id="book-form" class="search-row">
+          <div class="field"><label for="title">Title</label><input type="text" id="title" required></div>
+          <div class="field"><label for="author">Author</label><input type="text" id="author" required></div>
+          <button type="submit" class="btn">Add to shelf</button>
+        </form>
+      </details>
+    </section>
+
+    <section class="filters" aria-label="Find a book on your shelves">
+      <div class="field">
+        <label for="filter-text">Search your shelves</label>
+        <input type="search" id="filter-text" placeholder="Title or author">
+      </div>
+      <div id="genre-chips" class="chips" role="group" aria-label="Filter by genre"></div>
+    </section>
+
+    <div id="shelves"></div>
+  </div>
+
+  <section id="view-stats" hidden aria-labelledby="stats-heading">
+    <h2 id="stats-heading" class="section-title">Your reading</h2>
+    <div id="stats" class="stats"></div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>Your shelf lives in this browser's storage. Only book searches are sent, to Google Books.</p>
+</footer>
+<script src="script.js"></script>
+</body>
+</html>
