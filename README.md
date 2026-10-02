@@ -20,9 +20,9 @@ What tools did I use?
 
 How to access it
 
-Live site: [PASTE YOUR GITHUB PAGES URL HERE]
+Live site: (https://alissims.github.io/Project-02-Final-MVP/)
 
-Repository: [PASTE YOUR REPO URL HERE]
+Repository:(https://github.com/Alissims/Project-02-Final-MVP)
 
 What you have stored in your books is saved in the browser you are using. They will not be available in other browsers.
 
