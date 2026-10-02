@@ -87,6 +87,52 @@ function renderChips() {
   });
 }
 
+// Popular right now: titles seen on NYT best-seller lists, October 2026.
+const POPULAR = [
+  { title: "Theo of Golden", author: "Allen Levi", genre: "Novel", pages: 400, tag: "Book club pick" },
+  { title: "Actually, Nevermind", author: "Taylor Tomlinson", genre: "Essays", pages: 304, tag: "Funny dinner-table reading" },
+  { title: "Double Tap", author: "Vince Flynn and Don Bentley", genre: "Thriller", pages: 416, tag: "Cozy-night page-turner" },
+  { title: "Happy Snacking, Don't Die!", author: "Alexis Nikole Nelson", genre: "Cookbook", pages: 272, tag: "Great for party snacks" },
+  { title: "The Glass Castle", author: "Jeannette Walls", genre: "Memoir", pages: 304, tag: "Lots to discuss" },
+  { title: "Better Than the Movies", author: "Lynn Painter", genre: "Romance", pages: 384, tag: "Fall rom-com" },
+  { title: "Protocols", author: "Andrew D. Huberman", genre: "Health", pages: 688, tag: "New-year-reset chat" },
+  { title: "Dungeon Crawler Carl, Vol. 1", author: "Matt Dinniman", genre: "Graphic novel", pages: 320, tag: "Gift for gamers" }
+];
+const popularCovers = {};
+
+function renderPopular() {
+  const list = $("popular-list");
+  list.innerHTML = "";
+  POPULAR.forEach((p) => {
+    const li = el("li", { className: "book" });
+    li.style.setProperty("--status-color", "var(--reading)");
+    const onShelf = books.some((b) => b.title === p.title);
+    const btn = el("button", { type: "button", className: "btn small", textContent: onShelf ? "On your shelf ✓" : "Want to read", disabled: onShelf });
+    btn.addEventListener("click", () => addBook({ title: p.title, author: p.author, genre: p.genre, pages: p.pages, cover: popularCovers[p.title] || "", status: "want" }));
+    li.append(
+      cover({ title: p.title, cover: popularCovers[p.title] }),
+      el("div", { className: "book-title", textContent: p.title }),
+      el("div", { className: "book-author", textContent: p.author }),
+      el("div", { className: "book-meta", textContent: p.genre + " · " + p.tag }),
+      el("div", { className: "controls" }, btn)
+    );
+    list.append(li);
+  });
+}
+
+// Look up covers once; any failure just keeps the designed placeholder.
+async function loadPopularCovers() {
+  await Promise.all(POPULAR.map(async (p) => {
+    try {
+      const q = "intitle:" + p.title + " inauthor:" + p.author.split(" and ")[0];
+      const res = await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=1&printType=books&q=" + encodeURIComponent(q));
+      const img = (await res.json()).items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+      if (img) popularCovers[p.title] = img.replace("http://", "https://");
+    } catch (e) { /* keep placeholder */ }
+  }));
+  renderPopular();
+}
+
 function render() {
   const root = $("shelves");
   root.innerHTML = "";
@@ -106,6 +152,7 @@ function render() {
   });
   renderChips();
   renderStats();
+  renderPopular();
 }
 
 function renderStats() {
@@ -203,3 +250,20 @@ document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () 
 }));
 
 render();
+
+// Welcome book: opens on load, closes on button, Skip, or Escape.
+(function () {
+  const w = $("welcome");
+  function closeWelcome() {
+    w.classList.add("hide");
+    setTimeout(() => w.remove(), 500);
+    document.removeEventListener("keydown", onKey);
+  }
+  function onKey(e) { if (e.key === "Escape") closeWelcome(); }
+  $("welcome-go").addEventListener("click", closeWelcome);
+  $("welcome-skip").addEventListener("click", closeWelcome);
+  document.addEventListener("keydown", onKey);
+  $("welcome-go").focus({ preventScroll: true });
+})();
+
+loadPopularCovers();
