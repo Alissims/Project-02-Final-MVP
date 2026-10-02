@@ -1,4 +1,5 @@
 // PageTrail — books live in localStorage; Google Books is used for search only.
+// PageTrail — books live in localStorage; Google Books is used for search only.
 let books = JSON.parse(localStorage.getItem("pagetrail-books")) || [];
 let filter = { text: "", genre: "" };
 
@@ -18,14 +19,22 @@ function el(tag, props, ...kids) {
   return node;
 }
 
-function cover(book) {
-  if (book.cover) {
-    return el("img", { className: "cover", src: book.cover, alt: "Cover of " + book.title, loading: "lazy" });
-  }
+function placeholder(book) {
   const tone = [...book.title].reduce((n, c) => n + c.charCodeAt(0), 0) % 6;
   const ph = el("div", { className: "cover placeholder tone-" + tone, role: "img", ariaLabel: "No cover for " + book.title });
   ph.append(el("span", { textContent: book.title }));
   return ph;
+}
+
+// Tries the main cover, then a backup cover, then a designed placeholder.
+function cover(book) {
+  if (!book.cover) return placeholder(book);
+  const img = el("img", { className: "cover", src: book.cover, alt: "Cover of " + book.title, loading: "lazy" });
+  img.addEventListener("error", () => {
+    if (book.cover2 && img.src !== book.cover2) img.src = book.cover2;
+    else img.replaceWith(placeholder(book));
+  });
+  return img;
 }
 
 function card(book) {
@@ -89,16 +98,22 @@ function renderChips() {
 
 // Popular right now: titles seen on NYT best-seller lists, October 2026.
 const POPULAR = [
-  { title: "Theo of Golden", author: "Allen Levi", genre: "Novel", pages: 400, tag: "Book club pick" },
-  { title: "Actually, Nevermind", author: "Taylor Tomlinson", genre: "Essays", pages: 304, tag: "Funny dinner-table reading" },
-  { title: "Double Tap", author: "Vince Flynn and Don Bentley", genre: "Thriller", pages: 416, tag: "Cozy-night page-turner" },
-  { title: "Happy Snacking, Don't Die!", author: "Alexis Nikole Nelson", genre: "Cookbook", pages: 272, tag: "Great for party snacks" },
-  { title: "The Glass Castle", author: "Jeannette Walls", genre: "Memoir", pages: 304, tag: "Lots to discuss" },
-  { title: "Better Than the Movies", author: "Lynn Painter", genre: "Romance", pages: 384, tag: "Fall rom-com" },
-  { title: "Protocols", author: "Andrew D. Huberman", genre: "Health", pages: 688, tag: "New-year-reset chat" },
-  { title: "Dungeon Crawler Carl, Vol. 1", author: "Matt Dinniman", genre: "Graphic novel", pages: 320, tag: "Gift for gamers" }
+  { title: "Theo of Golden", author: "Allen Levi", genre: "Novel", pages: 400, isbn: "9781668236512", tag: "Book club pick" },
+  { title: "Actually, Nevermind", author: "Taylor Tomlinson", genre: "Essays", pages: 304, isbn: "9781668097236", tag: "Funny dinner-table reading" },
+  { title: "Double Tap", author: "Vince Flynn and Don Bentley", genre: "Thriller", pages: 416, isbn: "9781668045916", tag: "Cozy-night page-turner" },
+  { title: "Happy Snacking, Don't Die!", author: "Alexis Nikole Nelson", genre: "Cookbook", pages: 272, isbn: "9781668002544", tag: "Great for party snacks" },
+  { title: "The Glass Castle", author: "Jeannette Walls", genre: "Memoir", pages: 304, isbn: "9780743247542", tag: "Lots to discuss" },
+  { title: "Better Than the Movies", author: "Lynn Painter", genre: "Romance", pages: 384, isbn: "9781534467637", tag: "Fall rom-com" },
+  { title: "Protocols", author: "Andrew D. Huberman", genre: "Health", pages: 688, isbn: "9781668032145", tag: "New-year-reset chat" },
+  { title: "Dungeon Crawler Carl, Vol. 1", author: "Matt Dinniman", genre: "Graphic novel", pages: 320, isbn: "9781638493655", tag: "Gift for gamers" },
+  { title: "The Courage to Be Disliked", author: "Ichiro Kishimi and Fumitake Koga", genre: "Self-help", pages: 288, isbn: "9781668065969", tag: "Great conversation starter" },
+  { title: "Long Way Down", author: "Jason Reynolds", genre: "Novel in verse", pages: 336, isbn: "9781481438261", tag: "Quick, powerful read" }
 ];
-const popularCovers = {};
+// Cover images by ISBN: Open Library first, Google Books as backup.
+POPULAR.forEach((p) => {
+  p.cover = "https://covers.openlibrary.org/b/isbn/" + p.isbn + "-M.jpg?default=false";
+  p.cover2 = "https://books.google.com/books/content?vid=ISBN" + p.isbn + "&printsec=frontcover&img=1&zoom=1";
+});
 
 function renderPopular() {
   const list = $("popular-list");
@@ -108,9 +123,9 @@ function renderPopular() {
     li.style.setProperty("--status-color", "var(--reading)");
     const onShelf = books.some((b) => b.title === p.title);
     const btn = el("button", { type: "button", className: "btn small", textContent: onShelf ? "On your shelf ✓" : "Want to read", disabled: onShelf });
-    btn.addEventListener("click", () => addBook({ title: p.title, author: p.author, genre: p.genre, pages: p.pages, cover: popularCovers[p.title] || "", status: "want" }));
+    btn.addEventListener("click", () => addBook({ title: p.title, author: p.author, genre: p.genre, pages: p.pages, cover: p.cover, cover2: p.cover2, status: "want" }));
     li.append(
-      cover({ title: p.title, cover: popularCovers[p.title] }),
+      cover(p),
       el("div", { className: "book-title", textContent: p.title }),
       el("div", { className: "book-author", textContent: p.author }),
       el("div", { className: "book-meta", textContent: p.genre + " · " + p.tag }),
@@ -118,19 +133,6 @@ function renderPopular() {
     );
     list.append(li);
   });
-}
-
-// Look up covers once; any failure just keeps the designed placeholder.
-async function loadPopularCovers() {
-  await Promise.all(POPULAR.map(async (p) => {
-    try {
-      const q = "intitle:" + p.title + " inauthor:" + p.author.split(" and ")[0];
-      const res = await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=1&printType=books&q=" + encodeURIComponent(q));
-      const img = (await res.json()).items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
-      if (img) popularCovers[p.title] = img.replace("http://", "https://");
-    } catch (e) { /* keep placeholder */ }
-  }));
-  renderPopular();
 }
 
 function render() {
@@ -265,5 +267,3 @@ render();
   document.addEventListener("keydown", onKey);
   $("welcome-go").focus({ preventScroll: true });
 })();
-
-loadPopularCovers();
