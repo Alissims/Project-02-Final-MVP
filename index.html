@@ -38,6 +38,7 @@
     <nav class="tabs" aria-label="Views">
       <button class="tab active" data-view="shelves" aria-current="page">Shelves</button>
       <button class="tab" data-view="stats">Stats</button>
+      <button class="tab" data-view="card">My Card</button>
     </nav>
   </div>
 </header>
@@ -94,6 +95,19 @@
   <section id="view-stats" hidden aria-labelledby="stats-heading">
     <h2 id="stats-heading" class="section-title">Your reading</h2>
     <div id="stats" class="stats"></div>
+  </section>
+  <section id="view-card" hidden aria-labelledby="card-heading">
+    <h2 id="card-heading" class="section-title">Your library card</h2>
+    <div class="card-wrap">
+      <div id="library-card" class="library-card"></div>
+      <form id="card-form" class="card-form">
+        <div class="field"><label for="card-name">Your name</label><input type="text" id="card-name" autocomplete="name"></div>
+        <div class="field"><label for="card-city">City</label><input type="text" id="card-city" autocomplete="address-level2"></div>
+        <div class="field"><label for="card-state">State</label><input type="text" id="card-state" maxlength="20" autocomplete="address-level1"></div>
+        <button type="submit" class="btn">Save my card</button>
+        <p class="msg">Saved only in this browser.</p>
+      </form>
+    </div>
   </section>
 </main>
 
