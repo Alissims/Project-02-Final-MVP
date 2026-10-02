@@ -10,6 +10,18 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="welcome" class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+  <div class="open-book">
+    <div class="book-page">
+      <h2 id="welcome-title">Hello, and welcome to PageTrail!</h2>
+      <p>We're here to help you find your way, have fun, and keep track of the books you read and rate.</p>
+      <p>Open a shelf, search for a favorite, and give it your stars.</p>
+      <button id="welcome-go" class="btn" type="button">Open my shelf</button>
+    </div>
+    <div class="book-cover" aria-hidden="true"><span>PageTrail</span></div>
+  </div>
+  <button id="welcome-skip" class="skip" type="button">Skip intro</button>
+</div>
 <header class="site-header">
   <div class="header-inner">
     <div>
@@ -60,6 +72,12 @@
           <button type="submit" class="btn">Add to shelf</button>
         </form>
       </details>
+    </section>
+
+    <section class="popular" aria-labelledby="popular-heading">
+      <h2 id="popular-heading">Popular right now</h2>
+      <p class="popular-sub">Cozy-season reads for book clubs, gatherings, and long evenings. All have been on the New York Times best-seller lists this fall.</p>
+      <ul id="popular-list" class="book-grid"></ul>
     </section>
 
     <section class="filters" aria-label="Find a book on your shelves">
