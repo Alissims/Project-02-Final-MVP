@@ -1,5 +1,4 @@
 // PageTrail — books live in localStorage; Google Books is used for search only.
-// PageTrail — books live in localStorage; Google Books is used for search only.
 let books = JSON.parse(localStorage.getItem("pagetrail-books")) || [];
 let filter = { text: "", genre: "" };
 
@@ -37,6 +36,35 @@ function cover(book) {
   return img;
 }
 
+// Reading progress for books on the Reading shelf.
+function progressBlock(book) {
+  const box = el("div", { className: "progress" });
+  if (!book.pages) {
+    const t = el("input", { type: "number", min: 1, placeholder: "Total pages", ariaLabel: "Total pages for " + book.title });
+    t.addEventListener("change", () => {
+      const n = parseInt(t.value, 10);
+      if (n > 0) { book.pages = n; save(); render(); }
+    });
+    box.append(t);
+    return box;
+  }
+  const done = Math.min(book.page || 0, book.pages);
+  const pct = Math.round((done / book.pages) * 100);
+  const fill = el("span");
+  fill.style.width = pct + "%";
+  const bar = el("div", { className: "bar", role: "progressbar", ariaLabel: "Reading progress" }, fill);
+  bar.setAttribute("aria-valuenow", pct);
+  bar.setAttribute("aria-valuemin", 0);
+  bar.setAttribute("aria-valuemax", 100);
+  const input = el("input", { type: "number", min: 0, max: book.pages, value: done, ariaLabel: "Current page of " + book.title });
+  input.addEventListener("change", () => {
+    book.page = Math.max(0, Math.min(book.pages, parseInt(input.value, 10) || 0));
+    save(); render();
+  });
+  box.append(bar, el("label", {}, "Page ", input, " of " + book.pages + " (" + pct + "%)"));
+  return box;
+}
+
 function card(book) {
   const li = el("li", { className: "book" });
   li.style.setProperty("--status-color", "var(--" + book.status + ")");
@@ -70,6 +98,7 @@ function card(book) {
     el("div", { className: "book-title", textContent: book.title }),
     el("div", { className: "book-author", textContent: book.author }),
     meta ? el("div", { className: "book-meta", textContent: meta }) : "",
+    book.status === "reading" ? progressBlock(book) : "",
     controls
   );
   return li;
@@ -185,6 +214,8 @@ function moveBook(id, status) {
   const b = books.find((x) => x.id === id);
   b.status = status;
   if (status !== "read") b.rating = 0; else b.finished = Date.now();
+  if (status === "read" && b.pages) b.page = b.pages;
+  if (status === "want") b.page = 0;
   save(); render();
 }
 function rateBook(id, n) {
