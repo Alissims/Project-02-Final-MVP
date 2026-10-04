@@ -27,6 +27,10 @@ function placeholder(book) {
 
 // Tries the main cover, then a backup cover, then a designed placeholder.
 const coverTried = new Set();
+// Covers found through Google Books are remembered in this browser so we only ask once.
+const coverCache = JSON.parse(localStorage.getItem("pagetrail-covers")) || {};
+let coverQueue = Promise.resolve();
+
 function cover(book) {
   if (!book.cover) return placeholder(book);
   const img = el("img", { className: "cover", src: book.cover, alt: "Cover of " + book.title, loading: "lazy" });
@@ -34,26 +38,44 @@ function cover(book) {
     const key = book.isbn || book.title;
     if (coverTried.has(key)) { img.replaceWith(placeholder(book)); return; }
     coverTried.add(key);
+    img.replaceWith(placeholder(book)); // show the placeholder while we look
     const url = await lookupCover(book);
-    if (url) { book.cover = url; save(); img.src = url; }
-    else img.replaceWith(placeholder(book));
+    if (url) { book.cover = url; save(); render(); }
   });
   return img;
 }
 
-// Looks up a real cover through the Google Books API (ISBN first, then title and author).
-async function lookupCover(book) {
+// Asks Google Books for a cover, one request at a time so we stay under its rate limit.
+function lookupCover(book) {
+  const key = book.isbn || book.title + "|" + book.author;
+  if (coverCache[key]) return Promise.resolve(coverCache[key]);
+  const job = coverQueue.then(() => fetchCover(book, key));
+  coverQueue = job.catch(() => {}).then(() => new Promise((r) => setTimeout(r, 600)));
+  return job;
+}
+
+async function fetchCover(book, key) {
   const api = "https://www.googleapis.com/books/v1/volumes?maxResults=5&printType=books&q=";
   const queries = [];
   if (book.isbn) queries.push("isbn:" + book.isbn);
   queries.push("intitle:" + book.title + (book.author ? " inauthor:" + book.author.split(" and ")[0] : ""));
-  queries.push("intitle:" + book.title);
   for (const q of queries) {
     try {
-      const items = (await (await fetch(api + encodeURIComponent(q))).json()).items || [];
+      let res = await fetch(api + encodeURIComponent(q));
+      if (res.status === 429) {            // too many requests: wait once, then retry
+        await new Promise((r) => setTimeout(r, 2500));
+        res = await fetch(api + encodeURIComponent(q));
+      }
+      if (!res.ok) return "";              // give up for now; try again on a later visit
+      const items = (await res.json()).items || [];
       const hit = items.find((i) => i.volumeInfo.imageLinks && i.volumeInfo.imageLinks.thumbnail);
-      if (hit) return hit.volumeInfo.imageLinks.thumbnail.replace("http://", "https://");
-    } catch (e) { /* try the next query */ }
+      if (hit) {
+        const url = hit.volumeInfo.imageLinks.thumbnail.replace("http://", "https://");
+        coverCache[key] = url;
+        localStorage.setItem("pagetrail-covers", JSON.stringify(coverCache));
+        return url;
+      }
+    } catch (e) { return ""; }
   }
   return "";
 }
@@ -199,7 +221,7 @@ const POPULAR = [
 ];
 // Cover images by ISBN from Open Library; if one is missing, lookupCover() finds it through Google Books.
 POPULAR.forEach((p) => {
-  p.cover = "https://covers.openlibrary.org/b/isbn/" + p.isbn + "-M.jpg?default=false";
+  p.cover = coverCache[p.isbn] || "https://covers.openlibrary.org/b/isbn/" + p.isbn + "-M.jpg?default=false";
 });
 
 function renderPopular() {
