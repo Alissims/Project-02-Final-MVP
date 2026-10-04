@@ -26,14 +26,44 @@ function placeholder(book) {
 }
 
 // Tries the main cover, then a backup cover, then a designed placeholder.
+const coverTried = new Set();
 function cover(book) {
   if (!book.cover) return placeholder(book);
   const img = el("img", { className: "cover", src: book.cover, alt: "Cover of " + book.title, loading: "lazy" });
-  img.addEventListener("error", () => {
-    if (book.cover2 && img.src !== book.cover2) img.src = book.cover2;
+  img.addEventListener("error", async () => {
+    const key = book.isbn || book.title;
+    if (coverTried.has(key)) { img.replaceWith(placeholder(book)); return; }
+    coverTried.add(key);
+    const url = await lookupCover(book);
+    if (url) { book.cover = url; save(); img.src = url; }
     else img.replaceWith(placeholder(book));
   });
   return img;
+}
+
+// Looks up a real cover through the Google Books API (ISBN first, then title and author).
+async function lookupCover(book) {
+  const api = "https://www.googleapis.com/books/v1/volumes?maxResults=5&printType=books&q=";
+  const queries = [];
+  if (book.isbn) queries.push("isbn:" + book.isbn);
+  queries.push("intitle:" + book.title + (book.author ? " inauthor:" + book.author.split(" and ")[0] : ""));
+  queries.push("intitle:" + book.title);
+  for (const q of queries) {
+    try {
+      const items = (await (await fetch(api + encodeURIComponent(q))).json()).items || [];
+      const hit = items.find((i) => i.volumeInfo.imageLinks && i.volumeInfo.imageLinks.thumbnail);
+      if (hit) return hit.volumeInfo.imageLinks.thumbnail.replace("http://", "https://");
+    } catch (e) { /* try the next query */ }
+  }
+  return "";
+}
+
+// Quietly fills in covers for any shelf book that doesn't have one.
+function autoCovers() {
+  books.filter((b) => !b.cover).forEach(async (b) => {
+    const url = await lookupCover(b);
+    if (url) { b.cover = url; save(); render(); }
+  });
 }
 
 // Reading progress for books on the Reading shelf.
@@ -167,13 +197,10 @@ const POPULAR = [
   { title: "The Courage to Be Disliked", author: "Ichiro Kishimi and Fumitake Koga", genre: "Self-help", pages: 288, isbn: "9781668065969", tag: "Great conversation starter" },
   { title: "Long Way Down", author: "Jason Reynolds", genre: "Novel in verse", pages: 336, isbn: "9781481438261", tag: "Quick, powerful read" }
 ];
-// Cover images by ISBN: Open Library first, Google Books as backup.
+// Cover images by ISBN from Open Library; if one is missing, lookupCover() finds it through Google Books.
 POPULAR.forEach((p) => {
   p.cover = "https://covers.openlibrary.org/b/isbn/" + p.isbn + "-M.jpg?default=false";
-  p.cover2 = "https://books.google.com/books/content?vid=ISBN" + p.isbn + "&printsec=frontcover&img=1&zoom=1";
 });
-// Google only has a generic gray "no image" for this one, so use the designed placeholder.
-POPULAR.find((p) => p.title === "Actually, Nevermind").cover2 = "";
 
 function renderPopular() {
   const list = $("popular-list");
@@ -183,7 +210,7 @@ function renderPopular() {
     li.style.setProperty("--status-color", "var(--reading)");
     const onShelf = books.some((b) => b.title === p.title);
     const btn = el("button", { type: "button", className: "btn small", textContent: onShelf ? "On your shelf ✓" : "Want to read", disabled: onShelf });
-    btn.addEventListener("click", () => addBook({ title: p.title, author: p.author, genre: p.genre, pages: p.pages, cover: p.cover, cover2: p.cover2, status: "want" }));
+    btn.addEventListener("click", () => addBook({ title: p.title, author: p.author, genre: p.genre, pages: p.pages, cover: p.cover, isbn: p.isbn, status: "want" }));
     li.append(
       cover(p),
       el("div", { className: "book-title", textContent: p.title }),
@@ -199,24 +226,9 @@ function renderPopular() {
 async function findCover(book, btn) {
   btn.textContent = "Searching…";
   btn.disabled = true;
-  const queries = [
-    "intitle:" + book.title + " inauthor:" + book.author,
-    "intitle:" + book.title
-  ];
-  for (const q of queries) {
-    try {
-      const res = await fetch("https://www.googleapis.com/books/v1/volumes?maxResults=5&printType=books&q=" + encodeURIComponent(q));
-      const items = (await res.json()).items || [];
-      const hit = items.find((i) => i.volumeInfo.imageLinks && i.volumeInfo.imageLinks.thumbnail);
-      if (hit) {
-        book.cover = hit.volumeInfo.imageLinks.thumbnail.replace("http://", "https://");
-        if (!book.pages && hit.volumeInfo.pageCount) book.pages = hit.volumeInfo.pageCount;
-        save(); render();
-        return;
-      }
-    } catch (e) { /* try next query */ }
-  }
-  btn.textContent = "No cover found";
+  const url = await lookupCover(book);
+  if (url) { book.cover = url; save(); render(); }
+  else btn.textContent = "No cover found";
 }
 
 // Library card: a keepsake with the reader's name, city, and state (saved in this browser only).
@@ -380,6 +392,8 @@ document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () 
 }));
 
 render();
+
+autoCovers();
 
 // Welcome book: opens on load, closes on button, Skip, or Escape.
 (function () {
