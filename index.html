@@ -6,16 +6,19 @@
 <title>PageTrail — a private reading shelf</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=Caveat:wght@600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="welcome" class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
   <div class="open-book">
     <div class="book-page">
-      <h2 id="welcome-title">Hello, and welcome to PageTrail!</h2>
-      <p>We're here to help you find your way, have fun, and keep track of the books you read and rate.</p>
-      <p>Open a shelf, search for a favorite, and give it your stars.</p>
+      <div class="write">
+        <h2 id="welcome-title">Hello and welcome</h2>
+        <svg class="pen" viewBox="0 0 40 40" aria-hidden="true"><path d="M5 35 L9 24 L29 4 L36 11 L16 31 Z" fill="#c2255c"/><path d="M5 35 L9 24 L16 31 Z" fill="#232b23"/><path d="M29 4 L33 0 L40 7 L36 11 Z" fill="#f0a30a"/></svg>
+      </div>
+      <p class="to">to PageTrail</p>
+      <p class="blurb">We're here to help you find your way, have fun, and keep track of the books you read and rate.</p>
       <button id="welcome-go" class="btn" type="button">Open my shelf</button>
     </div>
     <div class="book-cover" aria-hidden="true"><span>PageTrail</span></div>
